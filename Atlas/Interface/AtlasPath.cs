@@ -1,4 +1,4 @@
-﻿namespace Atlas.Loader.Interface
+﻿namespace Atlas.EntryPoint.Interface
 {
     public enum AtlasPath
     {

@@ -2,14 +2,18 @@
 using System.IO;
 
 using PluginAPI.Core.Attributes;
+using PluginAPI.Core;
 
-using Atlas.Loader.Interface;
+using Atlas.EntryPoint.Interface;
 
-namespace Atlas.Loader
+using System.Linq;
+
+namespace Atlas.EntryPoint
 {
     public class EntryPoint
     {
         public static Interface.Atlas Atlas { get; private set; }
+        public static EntryPoint Instance { get; private set; }
 
         public static Version[] SupportedVersions { get; } = new Version[]
         {
@@ -32,8 +36,13 @@ namespace Atlas.Loader
             "fleccker")]
         public void Load()
         {
+            Instance = this;
+
+            Log.Info("Hello! Attempting to load ..", $"Atlas Loader");
+
             if (Atlas != null)
             {
+                Log.Debug($"", Config.AllowDebugLogs, "Atlas Loader");
                 ThrowAtlasError(AtlasResult.FailedAlreadyLoaded);
                 return;
             }
@@ -47,11 +56,17 @@ namespace Atlas.Loader
                 ThrowAtlasError(result, exception);
                 return;
             }
+
+            OnAtlasLoaded?.Invoke(Atlas);
+
+            Log.Info("Atlas succesfully loaded!", "Atlas Loader");
         }
 
         [PluginUnload]
         public void Unload()
         {
+            Log.Info($"Attempting to unload Atlas ..", "Atlas Loader");
+
             var result = Atlas.TryUnload(out var exception);
 
             if (result != AtlasResult.Success)
@@ -59,11 +74,17 @@ namespace Atlas.Loader
                 ThrowAtlasError(result, exception);
                 return;
             }
+
+            OnAtlasUnloaded?.Invoke(Atlas);
+
+            Log.Info($"Succesfully unloaded!", "Atlas Loader");
         }
 
         [PluginReload]
         public void Reload()
         {
+            Log.Info($"Attempting to reload Atlas ..", "Atlas Loader");
+
             var result = Atlas.TryReload(out var exception);
 
             if (result != AtlasResult.Success)
@@ -71,6 +92,10 @@ namespace Atlas.Loader
                 ThrowAtlasError(result, exception);
                 return;
             }
+
+            OnAtlasReloaded?.Invoke(Atlas);
+
+            Log.Info($"Succesfully reloaded!", "Atlas Loader");
         }
 
         private void ThrowAtlasError(AtlasResult atlasLoadResult, Exception exception = null)
@@ -79,6 +104,11 @@ namespace Atlas.Loader
                 exception = GetException(atlasLoadResult);
 
             OnError?.Invoke(Atlas, atlasLoadResult, exception);
+
+            Log.Error($"Atlas caught an exception! ThrowAtlasError triggered with result: {atlasLoadResult}", "Atlas Loader");
+
+            if (exception != null)
+                Log.Error($"{exception}", "Atlas Loader");
 
             throw exception;
         }
@@ -112,7 +142,7 @@ namespace Atlas.Loader
                     return new MissingMethodException($"Failed to locate the entry point method! ({Interface.Atlas.EntryPointType}::{Interface.Atlas.EntryPointMethod})");
 
                 case AtlasResult.FailedVersionMismatch:
-                    return new InvalidDataException($"Version mismatch! Expected any of {string.Join(", ", SupportedVersions)}; got {Atlas.Version}");
+                    return new InvalidDataException($"Version mismatch! Expected any of {String.Join<string>(", ", SupportedVersions.Select(x => x.ToString()))}; got {Atlas.Version}");
 
                 default:
                     return null;
